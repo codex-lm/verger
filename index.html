@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Verger</title>
+  <meta name="description" content="Verger — a match-3 orchard in broad daylight. Swap neighbouring fruits, harvest cascades, fill the basket before the moves run out.">
+  <style>
+/* Verger — feuille de style « forêt diurne » : feuillage profond, fruits juteux. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+:root {
+  --ciel: #eef5e2;         /* ciel du jour */
+  --feuillage: #3e7d4f;    /* vert feuillage profond */
+  --feuille: #a8c98a;      /* vert clair */
+  --bois: #7a5b3e;         /* tronc */
+  --encre: #2e3d2a;        /* texte */
+  --rouge: #d1493a;
+  --jaune: #e5a63b;
+  --prune: #7d5ba6;
+  --cerise: #b03a52;
+  --creme: #f7f9ef;
+}
+
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  background:
+    radial-gradient(ellipse at 20% -10%, rgba(255, 255, 240, 0.85), transparent 55%),
+    linear-gradient(170deg, var(--ciel) 0%, #dcecc9 100%) fixed;
+  color: var(--encre);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 12px 6px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------------------------- en-tête */
+#top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.brand h1 {
+  font-size: clamp(34px, 6.5vw, 50px);
+  letter-spacing: 0.16em;
+  font-weight: 900;
+  color: var(--feuillage);
+  text-shadow: 2px 2px 0 rgba(62, 125, 79, 0.25);
+}
+#tagline { font-size: 13px; font-style: italic; margin-top: 2px; color: #5c7053; }
+.topctl { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.langs { display: flex; gap: 4px; }
+
+/* ---------------------------------------------------------------- boutons */
+button {
+  font: inherit;
+  font-weight: 700;
+  color: var(--encre);
+  background: var(--creme);
+  border: 2.5px solid var(--encre);
+  border-radius: 12px;
+  padding: 8px 15px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 rgba(46, 61, 42, 0.25);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+button:hover { background: #ffffff; }
+button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(46, 61, 42, 0.25); }
+button:focus-visible { outline: 3px solid var(--feuillage); outline-offset: 2px; }
+button.primary { background: var(--feuillage); color: var(--creme); }
+button.big { font-size: 17px; padding: 12px 26px; }
+.pill { padding: 4px 10px; font-size: 12px; border-radius: 999px; border-width: 2px; }
+.pill.active { background: var(--encre); color: var(--creme); }
+
+/* ---------------------------------------------------------------- écrans */
+main { flex: 1; display: flex; flex-direction: column; }
+.screen { animation: fadein 0.25s ease; }
+.hidden { display: none !important; }
+@keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+
+.subtitle { margin: 18px 4px; max-width: 56ch; line-height: 1.6; font-size: 14.5px; }
+.homebtns { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 4px 16px; }
+.keys { color: #5c7053; font-size: 12.5px; margin: 12px 4px; text-align: center; }
+
+.levelgrid { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px; }
+.chip { width: 50px; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 16px; }
+.chip.locked { opacity: 0.4; cursor: default; }
+.chip-stars { font-size: 9px; color: #b98a2d; letter-spacing: 1px; margin-top: 2px; min-height: 11px; }
+
+/* ---------------------------------------------------------------- hud */
+.hud { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 8px 0 4px; flex-wrap: wrap; }
+.hud-mid { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; min-width: 0; }
+#hud-level { font-size: 14.5px; font-style: italic; }
+#hud-goal { font-size: 13px; font-weight: 700; }
+#btn-menu { font-size: 15px; padding: 8px 12px; }
+#hud-moves { font-size: 12.5px; color: #5c7053; }
+
+.goalwrap {
+  margin: 6px auto 8px;
+  width: min(420px, 92%);
+  height: 16px;
+  border: 2.5px solid var(--encre);
+  border-radius: 8px;
+  background: var(--creme);
+  overflow: hidden;
+  box-shadow: 2px 2px 0 rgba(46, 61, 42, 0.2);
+}
+#goalbar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--feuille), var(--feuillage));
+  transition: width 0.3s ease;
+}
+
+/* ---------------------------------------------------------------- plateau */
+#board-wrap { display: flex; justify-content: center; margin-top: 8px; }
+#board {
+  position: relative;
+  border: 4px solid var(--bois);
+  border-radius: 16px;
+  background:
+    repeating-linear-gradient(0deg, rgba(62, 125, 79, 0.16) 0 3px, transparent 3px 6px),
+    linear-gradient(160deg, #d3e8bf, #c3dcae);
+  box-shadow: inset 0 0 0 3px rgba(122, 91, 62, 0.35), 5px 6px 0 rgba(46, 61, 42, 0.22);
+  touch-action: manipulation;
+  overflow: hidden;
+}
+.fruit {
+  position: absolute;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease;
+  border-radius: 8px;
+}
+.fruit:hover { background: rgba(255, 255, 255, 0.22); }
+.fruit.sel {
+  background: rgba(255, 255, 255, 0.55);
+  outline: 3px dashed var(--feuillage);
+  transform: scale(0.94);
+}
+.fruit.harvested {
+  animation: harvest 0.32s ease forwards;
+}
+@keyframes harvest {
+  40% { transform: scale(1.25); background: rgba(255, 255, 240, 0.8); }
+  100% { transform: scale(0.1); opacity: 0; }
+}
+
+/* toast */
+#toast {
+  position: fixed;
+  left: 50%; bottom: 78px;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--encre);
+  color: var(--creme);
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  max-width: 88vw;
+  text-align: center;
+  z-index: 20;
+}
+#toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------------------------------------------------------------- overlays */
+#overlay {
+  position: fixed; inset: 0;
+  background: rgba(46, 61, 42, 0.42);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10;
+  padding: 20px;
+  animation: fadein 0.2s ease;
+}
+#overlay-card {
+  background: var(--creme);
+  border: 3px solid var(--encre);
+  border-radius: 14px;
+  box-shadow: 5px 5px 0 rgba(46, 61, 42, 0.25);
+  padding: 26px 24px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+}
+#overlay-card h2 { font-size: 24px; letter-spacing: 0.04em; margin-bottom: 12px; color: var(--feuillage); }
+.rules { text-align: left; }
+.rules p { margin: 10px 0; line-height: 1.6; font-size: 14px; }
+#overlay-card button { margin-top: 14px; }
+.btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.big { font-size: 19px; }
+.star-row { font-size: 36px; margin: 4px 0 10px; letter-spacing: 6px; }
+.star { color: rgba(46, 61, 42, 0.22); }
+.star.on { color: #b98a2d; animation: pop 0.4s ease; }
+@keyframes pop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); } }
+
+/* ---------------------------------------------------------------- pied */
+footer {
+  margin-top: 16px;
+  padding: 8px 4px 6px;
+  color: #5c7053;
+  font-size: 11.5px;
+  text-align: center;
+  font-style: italic;
+}
+@supports (padding: env(safe-area-inset-bottom)) {
+  footer { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+}
+
+</style>
+</head>
+<body>
+  <div id="app">
+    <header id="top">
+      <div class="brand">
+        <h1>VERGER</h1>
+        <p id="tagline"></p>
+      </div>
+      <div class="topctl">
+        <div id="langs" class="langs" role="group" aria-label="Language"></div>
+        <button id="btn-sound" class="ghost"></button>
+      </div>
+    </header>
+
+    <main>
+      <section id="home" class="screen">
+        <p class="subtitle" data-i18n="subtitle"></p>
+        <div class="homebtns">
+          <button id="btn-play" class="primary big"></button>
+          <button id="btn-howto" class="big"></button>
+        </div>
+        <div id="levelgrid" class="levelgrid"></div>
+        <p class="keys" data-i18n="touchHint"></p>
+      </section>
+
+      <section id="game" class="screen hidden">
+        <div class="hud">
+          <button id="btn-menu"></button>
+          <div class="hud-mid">
+            <span id="hud-level"></span>
+            <span id="hud-goal"></span>
+            <span id="hud-moves"></span>
+          </div>
+          <span style="width:1px"></span>
+        </div>
+        <div class="goalwrap"><div id="goalbar"></div></div>
+        <div id="board-wrap"><div id="board" aria-label="Verger board"></div></div>
+        <p class="keys" data-i18n="touchHint"></p>
+      </section>
+    </main>
+
+    <footer>
+      <span data-i18n="credit"></span>
+    </footer>
+  </div>
+
+  <div id="toast" role="status"></div>
+
+  <div id="overlay" class="hidden" role="dialog" aria-modal="true">
+    <div id="overlay-card"></div>
+  </div>
+
+  <script>
+/*
+ * Verger — moteur pur (sans DOM) : match-3 à échanges, gravité, objectifs.
+ * Grille d'arbres fruitiers ; échanger deux fruits adjacents (côté à côté) ;
+ * l'échange doit produire un alignement de 3+ sinon il est refusé ;
+ * les alignements sont récoltés, les fruits tombent (gravité), la canopée
+ * repousse par le haut (type tiré du RNG seedé). Objectif par niveau :
+ * récolter N fruits d'une variété (ou toutes variétés) en M coups.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.VergerEngine = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var KINDS = ['pomme', 'poire', 'prune', 'cerise']; // rouge, jaune-vert, violette, rouge foncé
+  var KIND_COLORS = { pomme: '#d1493a', poire: '#e5a63b', prune: '#7d5ba6', cerise: '#b03a52' };
+
+  function rndNext(s) {
+    s = (s + 0x6d2b79f5) | 0;
+    var t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return { s: s, v: ((t ^ (t >>> 14)) >>> 0) / 4294967296 };
+  }
+
+  // level : { name, w, h, kinds, moves, goal: {kind or 'toute', count}, grid? (optionnel) }
+  function createGame(level, seed) {
+    var g = {
+      w: level.w, h: level.h, kinds: level.kinds || 4,
+      moves: level.moves, movesLeft: level.moves,
+      goal: level.goal, name: level.name,
+      rngS: (seed >>> 0) || 20261105,
+      grid: [], score: 0, harvested: {}, won: false, lost: false,
+      cascade: 0, events: []
+    };
+    for (var i = 0; i < level.w * level.h; i++) g.harvested[KINDS[i % 4]] = 0;
+    // grille initiale : remplir par le RNG puis purger les alignements existants
+    if (level.grid) {
+      g.grid = level.grid.slice();
+    } else {
+      do {
+        for (var c = 0; c < level.w * level.h; c++)
+          g.grid[c] = Math.floor(rng(g) * g.kinds);
+      } while (findMatches(g).length > 0);
+    }
+    return g;
+  }
+
+  function rng(g) {
+    var r = rndNext(g.rngS);
+    g.rngS = r.s;
+    return r.v;
+  }
+
+  function at(g, r, c) { return g.grid[r * g.w + c]; }
+
+  // toutes les cases des alignements de 3+ (horizontaux et verticaux)
+  function findMatches(g) {
+    var marks = [];
+    for (var i = 0; i < g.w * g.h; i++) marks.push(false);
+    // horizontaux
+    for (var r = 0; r < g.h; r++) {
+      var run = 1;
+      for (var c = 1; c <= g.w; c++) {
+        if (c < g.w && at(g, r, c) === at(g, r, c - 1) && at(g, r, c) >= 0) run++;
+        else {
+          if (run >= 3)
+            for (var k = c - run; k < c; k++) marks[r * g.w + k] = true;
+          run = 1;
+        }
+      }
+    }
+    // verticaux
+    for (var c = 0; c < g.w; c++) {
+      var run2 = 1;
+      for (var r2 = 1; r2 <= g.h; r2++) {
+        if (r2 < g.h && at(g, r2, c) === at(g, r2 - 1, c) && at(g, r2, c) >= 0) run2++;
+        else {
+          if (run2 >= 3)
+            for (var k2 = r2 - run2; k2 < r2; k2++) marks[k2 * g.w + c] = true;
+          run2 = 1;
+        }
+      }
+    }
+    var out = [];
+    for (var m = 0; m < marks.length; m++) if (marks[m]) out.push(m);
+    return out;
+  }
+
+  /*
+   * Échanger deux cases adjacentes. Refusé si non adjacent ou si l'échange
+   * ne produit aucun alignement (règle du verger : on ne secoue pas les
+   * branches pour rien). Consomme un coup uniquement si accepté.
+   */
+  function swap(g, r1, c1, r2, c2) {
+    if (g.won || g.lost) return { ok: false, reason: 'over' };
+    if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return { ok: false, reason: 'far' };
+    var i1 = r1 * g.w + c1, i2 = r2 * g.w + c2;
+    var tmp = g.grid[i1];
+    g.grid[i1] = g.grid[i2];
+    g.grid[i2] = tmp;
+    if (findMatches(g).length === 0) {
+      // annule
+      g.grid[i2] = g.grid[i1];
+      g.grid[i1] = g.grid[i2];
+      g.grid[i1] = tmp;
+      return { ok: false, reason: 'noMatch' };
+    }
+    g.movesLeft--;
+    return resolve(g, { swap: [i1, i2] });
+  }
+
+  // récolter → gravité → repousse → re-récolter (cascade), puis objectif/coups
+  function resolve(g, info) {
+    var events = [];
+    var total = 0;
+    g.cascade = 0;
+    for (;;) {
+      var matches = findMatches(g);
+      if (matches.length === 0) break;
+      g.cascade++;
+      if (g.cascade > 2) break; // sève bornée : pas d'avalanche
+      var byKind = {};
+      for (var m = 0; m < matches.length; m++) {
+        var kind = KINDS[g.grid[matches[m]]];
+        g.harvested[kind] = (g.harvested[kind] || 0) + 1;
+        byKind[kind] = (byKind[kind] || 0) + 1;
+        g.grid[matches[m]] = -1;
+        total++;
+      }
+      events.push({ type: 'harvest', cells: matches.slice(), byKind: byKind, cascade: g.cascade });
+      // gravité
+      for (var c = 0; c < g.w; c++) {
+        var write = g.h - 1;
+        for (var r = g.h - 1; r >= 0; r--) {
+          if (g.grid[r * g.w + c] >= 0) {
+            g.grid[write * g.w + c] = g.grid[r * g.w + c];
+            write--;
+          }
+        }
+        for (var r2 = write; r2 >= 0; r2--) g.grid[r2 * g.w + c] = Math.floor(rng(g) * g.kinds);
+      }
+    }
+    g.score += total * 10 * (g.cascade >= 2 ? g.cascade : 1);
+    // objectif
+    var goalMet = g.goal.kind === 'toute'
+      ? Object.keys(g.harvested).reduce(function (a, k) { return a + g.harvested[k]; }, 0) >= g.goal.count
+      : (g.harvested[g.goal.kind] || 0) >= g.goal.count;
+    if (goalMet) g.won = true;
+    else if (g.movesLeft <= 0) g.lost = true;
+    return { ok: true, won: g.won, lost: g.lost, harvested: total, cascade: g.cascade, events: events, info: info };
+  }
+
+  function stars(g) {
+    if (!g.won) return 0;
+    return g.movesLeft >= Math.ceil(g.moves / 3) ? 3 : g.movesLeft > 0 ? 2 : 1;
+  }
+
+  return { KINDS: KINDS, KIND_COLORS: KIND_COLORS, createGame: createGame,
+           findMatches: findMatches, swap: swap, stars: stars, rng: rng };
+});
+
+</script>
+  <script>
+/*
+ * Verger — niveaux. kinds = nombre de variétés (2-4) ; moves = coups ;
+ * goal = { kind: 'pomme'|…|'toute', count } récoltes visées.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.VergerLevels = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  return {
+    levels: [
+      { name: 'Première cueillette', w: 6, h: 6, kinds: 2, moves: 6, goal: { kind: 'toute', count: 40 } },
+      { name: 'Rouges', w: 6, h: 6, kinds: 2, moves: 6, goal: { kind: 'pomme', count: 36 } },
+      { name: 'Panier mixte', w: 7, h: 6, kinds: 3, moves: 6, goal: { kind: 'toute', count: 42 } },
+      { name: 'Prunes', w: 7, h: 6, kinds: 3, moves: 6, goal: { kind: 'prune', count: 30 } },
+      { name: 'Greffe serrée', w: 7, h: 7, kinds: 3, moves: 6, goal: { kind: 'poire', count: 28 } },
+      { name: 'Quatre saisons', w: 8, h: 7, kinds: 4, moves: 7, goal: { kind: 'toute', count: 52 } },
+      { name: 'Cerises noires', w: 8, h: 7, kinds: 4, moves: 8, goal: { kind: 'cerise', count: 32 } },
+      { name: 'Économie', w: 6, h: 6, kinds: 3, moves: 3, goal: { kind: 'toute', count: 32 } },
+      { name: 'Le grand verger', w: 8, h: 8, kinds: 4, moves: 8, goal: { kind: 'prune', count: 38 } },
+      { name: 'Toutes variétés', w: 8, h: 8, kinds: 4, moves: 9, goal: { kind: 'pomme', count: 40 } },
+      { name: 'Sève montante', w: 7, h: 8, kinds: 4, moves: 5, goal: { kind: 'toute', count: 58 } },
+      { name: 'La dernière récolte', w: 8, h: 8, kinds: 4, moves: 9, goal: { kind: 'cerise', count: 38 } }
+    ]
+  };
+});
+
+</script>
+  <script>
+/*
+ * Verger — interface multilingue (EN par défaut, FR, ES).
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.VergerI18n = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  var dict = {
+    en: {
+      tagline: "A match-3 orchard, in broad daylight",
+      subtitle: "Swap two neighbouring fruits to line up three or more of a kind. Harvests cascade as the canopy regrows — chain them for bonus points, and spend your moves wisely: each level wants a specific basket before the moves run out.",
+      play: "Play",
+      continueGame: "Continue",
+      howTo: "How to play",
+      rulesTitle: "How to play",
+      rule1: "Tap a fruit, then a neighbouring one (or drag): they swap. The swap must line up three or more identical fruits in a row or column — otherwise the branch refuses.",
+      rule2: "Harvested fruits vanish; the canopy above falls and new buds regrow at the top. Chain reactions give bonus points.",
+      rule3: "Each level has a basket to fill before the moves run out — apples, pears, plums, cherries or any fruit at all.",
+      rule4: "Finish with moves to spare for brighter stars.",
+      level: "Orchard",
+      goal: "Basket",
+      any: "any fruit",
+      movesLeft: "moves left",
+      score: "Score",
+      pomme: "apples",
+      poire: "pears",
+      prune: "plums",
+      cerise: "cherries",
+      invalid: "That swap harvests nothing — the branch refuses.",
+      menu: "Menu",
+      next: "Next orchard",
+      replay: "Replay",
+      wonTitle: "Basket full!",
+      lostTitle: "Out of moves",
+      finalTitle: "The whole orchard is picked",
+      finalBody: "Every basket is full. The orchard rests until spring.",
+      total: "Total score",
+      replayAll: "Start over",
+      touchHint: "Tap a fruit, then a neighbour — or drag",
+      langLabel: "Language",
+      soundOn: "Sound on",
+      soundOff: "Sound off",
+      close: "Close",
+      credit: "A game by Cédric Bernadac, created with AI agents (ZCode).",
+      gotIt: "Got it"
+    },
+    fr: {
+      tagline: "Un verger d'alignements, en pleine lumière",
+      subtitle: "Échangez deux fruits voisins pour en aligner trois ou plus. Les récoltes s'enchaînent quand la canopée repousse — mariez-les pour des points bonus, et dépensez vos coups avec soin : chaque niveau demande un panier précis avant l'épuisement des coups.",
+      play: "Jouer",
+      continueGame: "Continuer",
+      howTo: "Comment jouer",
+      rulesTitle: "Comment jouer",
+      rule1: "Touchez un fruit puis son voisin (ou glissez) : ils s'échangent. L'échange doit aligner trois fruits identiques ou plus, en ligne ou en colonne — sinon la branche refuse.",
+      rule2: "Les fruits récoltés disparaissent ; la canopée tombe et de nouveaux bourgeons repoussent en haut. Les réactions en chaîne donnent des points bonus.",
+      rule3: "Chaque niveau a un panier à remplir avant l'épuisement des coups — pommes, poires, prunes, cerises ou tout fruit.",
+      rule4: "Terminez avec des coups en réserve pour des étoiles plus brillantes.",
+      level: "Verger",
+      goal: "Panier",
+      any: "tout fruit",
+      movesLeft: "coups restants",
+      score: "Score",
+      pomme: "pommes",
+      poire: "poires",
+      prune: "prunes",
+      cerise: "cerises",
+      invalid: "Cet échange ne récolte rien — la branche refuse.",
+      menu: "Menu",
+      next: "Verger suivant",
+      replay: "Rejouer",
+      wonTitle: "Panier rempli !",
+      lostTitle: "Plus de coups",
+      finalTitle: "Tout le verger est cueilli",
+      finalBody: "Tous les paniers sont pleins. Le verger se repose jusqu'au printemps.",
+      total: "Score total",
+      replayAll: "Tout recommencer",
+      touchHint: "Touchez un fruit puis son voisin — ou glissez",
+      langLabel: "Langue",
+      soundOn: "Son activé",
+      soundOff: "Son coupé",
+      close: "Fermer",
+      credit: "Un jeu de Cédric Bernadac, créé avec des agents IA.",
+      gotIt: "Compris"
+    },
+    es: {
+      tagline: "Un huerto de alineaciones, a plena luz",
+      subtitle: "Intercambia dos frutas vecinas para alinear tres o más iguales. Las cosechas se encadenan cuando la copa rebrote — encadénalas para puntos extra, y gasta tus movimientos con cabeza: cada nivel pide una cesta concreta antes de agotarlos.",
+      play: "Jugar",
+      continueGame: "Continuar",
+      howTo: "Cómo jugar",
+      rulesTitle: "Cómo jugar",
+      rule1: "Toca una fruta y luego su vecina (o desliza): se intercambian. El intercambio debe alinear tres frutas iguales o más, en fila o columna — si no, la rama se niega.",
+      rule2: "Las frutas cosechadas desaparecen; la copa cae y nuevos brotes rebrotan arriba. Las reacciones en cadena dan puntos extra.",
+      rule3: "Cada nivel tiene una cesta que llenar antes de agotar los movimientos — manzanas, peras, ciruelas, cerezas o cualquier fruta.",
+      rule4: "Termina con movimientos de sobra para estrellas más brillantes.",
+      level: "Huerto",
+      goal: "Cesta",
+      any: "cualquier fruta",
+      movesLeft: "movimientos",
+      score: "Puntos",
+      pomme: "manzanas",
+      poire: "peras",
+      prune: "ciruelas",
+      cerise: "cerezas",
+      invalid: "Ese intercambio no cosecha nada — la rama se niega.",
+      menu: "Menú",
+      next: "Huerto siguiente",
+      replay: "Repetir",
+      wonTitle: "¡Cesta llena!",
+      lostTitle: "Sin movimientos",
+      finalTitle: "Todo el huerto está cosechado",
+      finalBody: "Todas las cestas están llenas. El huerto descansa hasta la primavera.",
+      total: "Puntuación total",
+      replayAll: "Empezar de nuevo",
+      touchHint: "Toca una fruta y luego su vecina — o desliza",
+      langLabel: "Idioma",
+      soundOn: "Sonido activado",
+      soundOff: "Sonido silenciado",
+      close: "Cerrar",
+      credit: "Un juego de Cédric Bernadac, creado con agentes de IA.",
+      gotIt: "Entendido"
+    }
+  };
+  return {
+    langs: ['en', 'fr', 'es'],
+    dict: dict,
+    get: function (lang, key) {
+      var d = dict[lang] || dict.en;
+      return d[key] !== undefined ? d[key] : dict.en[key];
+    }
+  };
+});
+
+</script>
+  <script>
+/*
+ * Verger — mini-synthé WebAudio : cueillette, chute, panier plein.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(root);
+  else root.VergerAudio = factory(root);
+})(typeof self !== 'undefined' ? self : this, function (root) {
+  'use strict';
+  var ctx = null, enabled = true;
+
+  function ensure() {
+    if (!ctx) {
+      var AC = root.AudioContext || root.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function tone(freq, dur, type, gain, when, slideTo) {
+    if (!enabled) return;
+    try {
+      var c = ensure();
+      if (!c) return;
+      var t = c.currentTime + (when || 0);
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(freq, t);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain || 0.08, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(t); o.stop(t + dur + 0.05);
+    } catch (e) { /* silence */ }
+  }
+
+  return {
+    setEnabled: function (v) { enabled = !!v; },
+    isEnabled: function () { return enabled; },
+    unlock: function () { ensure(); },
+    pick: function (n) { tone(420 + n * 60, 0.08, 'triangle', 0.07); },
+    swapFail: function () { tone(180, 0.1, 'sine', 0.05, 0, 140); },
+    ui: function () { tone(700, 0.045, 'sine', 0.05); },
+    win: function () { [523, 659, 784, 1046].forEach(function (f, i) { tone(f, 0.18, 'sine', 0.08, i * 0.09); }); },
+    lose: function () { [330, 262, 196].forEach(function (f, i) { tone(f, 0.3, 'triangle', 0.07, i * 0.2); }); }
+  };
+});
+
+</script>
+  <script>
+/*
+ * Verger — contrôleur : grille de fruits, sélection/échange, HUD objectif.
+ */
+(function () {
+  'use strict';
+  var E = window.VergerEngine, LV = window.VergerLevels.levels, I18N = window.VergerI18n, AU = window.VergerAudio;
+
+  var SAVE_KEY = 'verger.save.v1';
+  var save = { unlocked: 1, stars: {}, best: {}, lang: 'en', sound: true };
+  try {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      save = { unlocked: p.unlocked || 1, stars: p.stars || {}, best: p.best || {},
+               lang: p.lang || 'en', sound: p.sound !== false };
+    }
+  } catch (e) {}
+  function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+  function t(k) { return I18N.get(save.lang, k); }
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function show(node, on) { node.classList.toggle('hidden', !on); }
+
+  var g = null;               // partie courante
+  var levelIndex = 0;
+  var selected = null;        // index de la case sélectionnée
+  var busy = false;
+  var cell = 56;
+
+  function renderTexts() {
+    document.documentElement.lang = save.lang;
+    var nodes = document.querySelectorAll('[data-i18n]');
+    for (var i = 0; i < nodes.length; i++) nodes[i].textContent = t(nodes[i].getAttribute('data-i18n'));
+    $('tagline').textContent = t('tagline');
+    $('btn-play').textContent = save.unlocked > 1 ? t('continueGame') : t('play');
+    $('btn-howto').textContent = t('howTo');
+    $('btn-sound').textContent = (save.sound ? '♪ ' : '✕ ') + t(save.sound ? 'soundOn' : 'soundOff');
+    $('btn-menu').textContent = '⌂';
+    $('btn-menu').setAttribute('aria-label', t('menu'));
+    renderLangPills();
+    renderLevelGrid();
+    if (g) renderHud();
+  }
+
+  function renderLangPills() {
+    var box = $('langs');
+    box.textContent = '';
+    I18N.langs.forEach(function (code) {
+      var b = el('button', 'pill' + (save.lang === code ? ' active' : ''), code.toUpperCase());
+      b.addEventListener('click', function () { save.lang = code; persist(); AU.ui(); renderTexts(); });
+      box.appendChild(b);
+    });
+  }
+
+  function renderLevelGrid() {
+    var grid = $('levelgrid');
+    grid.textContent = '';
+    LV.forEach(function (lvl, i) {
+      var locked = i + 1 > save.unlocked;
+      var chip = el('button', 'chip' + (locked ? ' locked' : ''), locked ? '•' : String(i + 1));
+      if (!locked) {
+        var stars = save.stars[i] || 0;
+        chip.appendChild(el('span', 'chip-stars', stars ? '★'.repeat(stars) : ' '));
+        chip.addEventListener('click', function () { AU.ui(); openLevel(i); });
+      }
+      grid.appendChild(chip);
+    });
+  }
+
+  function cellSize() {
+    var availW = Math.min(window.innerWidth - 28, 460);
+    var availH = window.innerHeight - 330;
+    return Math.max(28, Math.floor(Math.min(availW / g.w, availH / g.h, 56)));
+  }
+
+  var FRUIT = ['🍎', '🍐', '🍆', '🍒']; // pomme, poire, prune, cerise
+
+  function buildBoard() {
+    cell = cellSize();
+    var board = $('board');
+    board.textContent = '';
+    board.style.width = g.w * cell + 'px';
+    board.style.height = g.h * cell + 'px';
+    for (var r = 0; r < g.h; r++) {
+      for (var c = 0; c < g.w; c++) {
+        var sq = el('div', 'fruit');
+        sq.style.left = c * cell + 'px';
+        sq.style.top = r * cell + 'px';
+        sq.style.width = cell + 'px';
+        sq.style.height = cell + 'px';
+        sq.style.fontSize = Math.floor(cell * 0.52) + 'px';
+        sq.setAttribute('data-i', r * g.w + c);
+        sq.addEventListener('click', onFruitClick(sq.getAttribute('data-i')));
+        board.appendChild(sq);
+      }
+    }
+    renderFruits();
+    renderHud();
+  }
+
+  function onFruitClick(iStr) {
+    var i = Number(iStr);
+    return function () { selectFruit(i); };
+  }
+
+  function renderFruits() {
+    var board = $('board');
+    var nodes = board.querySelectorAll('.fruit');
+    for (var k = 0; k < nodes.length; k++) {
+      var i = Number(nodes[k].getAttribute('data-i'));
+      nodes[k].textContent = FRUIT[g.grid[i]];
+      nodes[k].classList.toggle('sel', selected === i);
+    }
+  }
+
+  function renderHud() {
+    var lvl = LV[levelIndex];
+    $('hud-level').textContent = t('level') + ' ' + (levelIndex + 1) + ' — ' + lvl.name;
+    var goalKind = lvl.goal.kind === 'toute' ? t('any') : t(lvl.goal.kind);
+    var have = lvl.goal.kind === 'toute'
+      ? Object.keys(g.harvested).reduce(function (a, k) { return a + g.harvested[k]; }, 0)
+      : (g.harvested[lvl.goal.kind] || 0);
+    $('hud-goal').textContent = '🧺 ' + t('goal') + ' : ' + goalKind + ' ' + have + '/' + lvl.goal.count;
+    $('hud-moves').textContent = '✋ ' + g.movesLeft + ' ' + t('movesLeft') + ' · ' + t('score') + ' ' + g.score;
+    var pct = Math.min(100, 100 * have / lvl.goal.count);
+    $('goalbar').style.width = pct + '%';
+  }
+
+  function openLevel(i) {
+    levelIndex = i;
+    g = E.createGame(LV[i], (Date.now() & 0xffffffff) >>> 0);
+    selected = null;
+    busy = false;
+    show($('home'), false);
+    show($('game'), true);
+    buildBoard();
+  }
+
+  function goMenu() {
+    g = null; busy = false;
+    show($('game'), false);
+    show($('home'), true);
+    renderTexts();
+  }
+
+  function toast(msg) {
+    var box = $('toast');
+    box.textContent = msg;
+    box.classList.add('on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { box.classList.remove('on'); }, 1500);
+  }
+
+  function selectFruit(i) {
+    if (!g || busy) return;
+    AU.unlock();
+    if (selected === null) { selected = i; renderFruits(); return; }
+    if (selected === i) { selected = null; renderFruits(); return; }
+    // adjacent ?
+    var a = selected, b = i;
+    var ar = Math.floor(a / g.w), ac = a % g.w;
+    var br = Math.floor(b / g.w), bc = b % g.w;
+    if (Math.abs(ar - br) + Math.abs(ac - bc) !== 1) {
+      selected = i; renderFruits(); return; // re-sélectionne ailleurs
+    }
+    trySwap(ar, ac, br, bc);
+    selected = null;
+  }
+
+  function trySwap(r1, c1, r2, c2) {
+    var before = g.grid.slice();
+    var res = E.swap(g, r1, c1, r2, c2);
+    if (!res.ok) {
+      if (res.reason === 'noMatch') { AU.swapFail(); toast(t('invalid')); }
+      renderFruits();
+      return;
+    }
+    busy = true;
+    AU.pick(res.cascade);
+    // animation : flash des cases récoltées puis rendu final
+    var board = $('board');
+    res.events.forEach(function (ev) {
+      ev.cells.forEach(function (ci) {
+        var node = board.querySelector('[data-i="' + ci + '"]');
+        if (node) node.classList.add('harvested');
+      });
+    });
+    setTimeout(function () {
+      g.grid.forEach(function (v, ci) {
+        var node = board.querySelector('[data-i="' + ci + '"]');
+        if (node) node.classList.remove('harvested');
+      });
+      before = null;
+      renderFruits();
+      renderHud();
+      busy = false;
+      if (res.won) {
+        AU.win();
+        var stars = E.stars(g);
+        save.stars[levelIndex] = Math.max(save.stars[levelIndex] || 0, stars);
+        save.best[levelIndex] = Math.max(save.best[levelIndex] || 0, g.score);
+        if (levelIndex + 2 > save.unlocked) save.unlocked = Math.min(LV.length, levelIndex + 2);
+        persist();
+        setTimeout(showWin, 450);
+      } else if (res.lost) {
+        AU.lose();
+        setTimeout(showLost, 450);
+      }
+    }, 320);
+  }
+
+  // glisser un fruit vers son voisin
+  (function () {
+    var board = $('board');
+    var dragFrom = null;
+    board.addEventListener('pointerdown', function (ev) {
+      if (!g || busy) return;
+      AU.unlock();
+      var node = ev.target.closest('.fruit');
+      if (node) dragFrom = Number(node.getAttribute('data-i'));
+    });
+    board.addEventListener('pointerup', function (ev) {
+      if (!g || busy || dragFrom === null) { dragFrom = null; return; }
+      var node = document.elementFromPoint(ev.clientX, ev.clientY);
+      node = node && node.closest ? node.closest('.fruit') : null;
+      if (node) {
+        var to = Number(node.getAttribute('data-i'));
+        var a = dragFrom, b = to;
+        var ar = Math.floor(a / g.w), ac = a % g.w;
+        var br = Math.floor(b / g.w), bc = b % g.w;
+        if (a !== b && Math.abs(ar - br) + Math.abs(ac - bc) === 1) {
+          selected = null;
+          trySwap(ar, ac, br, bc);
+        } else {
+          selectFruit(a);
+        }
+      }
+      dragFrom = null;
+    });
+  })();
+
+  // ---------------------------------------------------------------- overlays
+  function overlay(content) {
+    var card = $('overlay-card');
+    card.textContent = '';
+    card.appendChild(content);
+    show($('overlay'), true);
+  }
+  function closeOverlay() { show($('overlay'), false); }
+
+  function showRules() {
+    var box = el('div', 'rules');
+    box.appendChild(el('h2', null, t('rulesTitle')));
+    [1, 2, 3, 4].forEach(function (n) { box.appendChild(el('p', null, t('rule' + n))); });
+    var btn = el('button', 'primary', t('gotIt'));
+    btn.addEventListener('click', function () { AU.ui(); closeOverlay(); });
+    box.appendChild(btn);
+    overlay(box);
+  }
+
+  function resultBox(title, subtitle, showStars) {
+    var box = el('div', 'modal');
+    box.appendChild(el('h2', null, title));
+    if (subtitle) box.appendChild(el('p', null, subtitle));
+    if (showStars) {
+      var stars = E.stars(g);
+      var row = el('div', 'star-row');
+      for (var s = 0; s < 3; s++) row.appendChild(el('span', 'star' + (s < stars ? ' on' : ''), '★'));
+      box.appendChild(row);
+    }
+    return box;
+  }
+
+  function showWin() {
+    var isLast = levelIndex === LV.length - 1;
+    var box;
+    if (isLast) {
+      var total = 0;
+      LV.forEach(function (_, i) { total += save.best[i] || 0; });
+      box = resultBox(t('finalTitle'), t('finalBody'));
+      box.appendChild(el('p', 'big', t('total') + ' : ' + total));
+      var again = el('button', 'primary', t('replayAll'));
+      again.addEventListener('click', function () {
+        AU.ui(); closeOverlay();
+        save.unlocked = 1; save.stars = {}; save.best = {}; persist();
+        openLevel(0);
+      });
+      box.appendChild(again);
+    } else {
+      box = resultBox(t('wonTitle'), g.score + ' ' + t('score'), true);
+      var next = el('button', 'primary', t('next'));
+      next.addEventListener('click', function () { AU.ui(); closeOverlay(); openLevel(levelIndex + 1); });
+      box.appendChild(next);
+    }
+    var replay = el('button', null, t('replay'));
+    replay.addEventListener('click', function () { AU.ui(); closeOverlay(); openLevel(levelIndex); });
+    var menu = el('button', null, t('menu'));
+    menu.addEventListener('click', function () { AU.ui(); closeOverlay(); goMenu(); });
+    var row2 = el('div', 'btn-row');
+    row2.appendChild(replay); row2.appendChild(menu);
+    box.appendChild(row2);
+    overlay(box);
+  }
+
+  function showLost() {
+    var box = resultBox(t('lostTitle'), null, false);
+    var replay = el('button', 'primary', t('replay'));
+    replay.addEventListener('click', function () { AU.ui(); closeOverlay(); openLevel(levelIndex); });
+    box.appendChild(replay);
+    var menu = el('button', null, t('menu'));
+    menu.addEventListener('click', function () { AU.ui(); closeOverlay(); goMenu(); });
+    box.appendChild(menu);
+    overlay(box);
+  }
+
+  // ---------------------------------------------------------------- boutons
+  $('btn-play').addEventListener('click', function () {
+    AU.ui(); AU.unlock();
+    openLevel(Math.min(save.unlocked, LV.length) - 1);
+  });
+  $('btn-howto').addEventListener('click', function () { AU.ui(); showRules(); });
+  $('btn-sound').addEventListener('click', function () {
+    save.sound = !save.sound; persist();
+    AU.setEnabled(save.sound);
+    renderTexts();
+    if (save.sound) AU.ui();
+  });
+  $('btn-menu').addEventListener('click', function () { AU.ui(); goMenu(); });
+  $('overlay').addEventListener('click', function (ev) { if (ev.target === $('overlay')) closeOverlay(); });
+  window.addEventListener('resize', function () { if (g && !busy) buildBoard(); });
+
+  // hook QA (?debug=1)
+  if (location.search.indexOf('debug=1') !== -1) {
+    window.__verger = {
+      g: function () { return g; },
+      engine: E, levels: LV, save: save,
+      open: openLevel,
+      swap: function (r1, c1, r2, c2) { selected = null; trySwap(r1, c1, r2, c2); },
+      bestSwap: function () {
+        // trouve et joue le meilleur échange (pour QA)
+        var best = null;
+        for (var r = 0; r < g.h; r++) for (var c = 0; c < g.w; c++)
+          for (var d = 0; d < 2; d++) {
+            var r2 = r + (d === 0 ? 0 : 1), c2 = c + (d === 0 ? 1 : 0);
+            if (r2 >= g.h || c2 >= g.w) continue;
+            var probe = { w: g.w, h: g.h, kinds: g.kinds, moves: g.moves, movesLeft: g.movesLeft,
+                          goal: g.goal, name: g.name, rngS: g.rngS, grid: g.grid.slice(),
+                          score: g.score, harvested: JSON.parse(JSON.stringify(g.harvested)),
+                          won: g.won, lost: g.lost, cascade: 0, events: [] };
+            var res = E.swap(probe, r, c, r2, c2);
+            if (res.ok && (!best || res.harvested > best.h)) best = { r: r, c: c, r2: r2, c2: c2, h: res.harvested };
+          }
+        if (best) { trySwap(best.r, best.c, best.r2, best.c2); return best.h; }
+        return 0;
+      }
+    };
+  }
+
+  // ---------------------------------------------------------------- démarrage
+  AU.setEnabled(save.sound);
+  renderTexts();
+  show($('home'), true);
+})();
+
+</script>
+</body>
+</html>
