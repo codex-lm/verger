@@ -1,0 +1,24 @@
+{
+  "title": "Verger",
+  "description": "A match-3 orchard in broad daylight. Swap two neighbouring fruits to line up three or more of a kind; harvests cascade as the canopy falls and regrows. Twelve orchards, each with a basket to fill before the moves run out — apples, pears, plums, cherries or any fruit — tuned by simulation so the difficulty climbs from first picking to the great orchard. Lush green palette, touch-first, in English, French and Spanish.",
+  "entrypoint": "index.html",
+  "license": "MIT",
+  "controls": [
+    "Tap a fruit, then a neighbouring one — or drag one onto its neighbour — to swap them.",
+    "A swap must line up three or more identical fruits in a row or column; otherwise the branch refuses and no move is spent.",
+    "Fill the basket shown at the top before the moves run out; finish with moves to spare for brighter stars."
+  ],
+  "genre": [
+    "Puzzle",
+    "Match-3"
+  ],
+  "themes": [
+    "Orchard",
+    "Harvest",
+    "Cascade"
+  ],
+  "credits": [
+    "A game by Cédric Bernadac, created with AI agents (ZCode)."
+  ],
+  "cover": "cover.png"
+}
